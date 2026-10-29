@@ -11,13 +11,7 @@ import { getStorage, connectStorageEmulator } from 'https://www.gstatic.com/fire
 
 // 1. Firebase Configuration (Project: ecom-bd90e)
 const firebaseConfig = {
-  apiKey: "AIzaSyA34zb55CABCyrDHR9Njno7VlwXF-HJVto",
-  authDomain: "ecom-bd90e.firebaseapp.com",
-  projectId: "ecom-bd90e",
-  storageBucket: "ecom-bd90e.firebasestorage.app",
-  messagingSenderId: "924059473322",
-  appId: "1:924059473322:web:ca9c5220d65691d2c107d3",
-  measurementId: "G-DZ5W5TRGF2"
+ 
 };
 
 // 2. Initialize Firebase App (prevent re-initializing if already initialized)
