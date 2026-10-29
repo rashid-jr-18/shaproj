@@ -60,6 +60,13 @@ class HiraAdminApp {
     }
   }
 
+  async quickDemoLogin() {
+    document.getElementById('admEmail').value = 'admin@hira.in';
+    document.getElementById('admPassword').value = 'HiraAdminSecure2026!';
+    await this.fetchCurrent2FaCode();
+    await this.login();
+  }
+
   async login() {
     const email = document.getElementById('admEmail').value;
     const password = document.getElementById('admPassword').value;
@@ -255,10 +262,28 @@ class HiraAdminApp {
 
   renderProducts() {
     const tbody = document.getElementById('adminProductsTbody');
-    tbody.innerHTML = this.products
+    const term = (this.catalogFilter || '').toLowerCase().trim();
+    const list = term
+      ? this.products.filter(
+          (p) =>
+            p.name.toLowerCase().includes(term) ||
+            p.sku.toLowerCase().includes(term) ||
+            (p.category && p.category.name.toLowerCase().includes(term))
+        )
+      : this.products;
+
+    if (!list || list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--hira-text-muted); padding: 30px;">No products matching filter.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = list
       .map(
         (p) => `
         <tr>
+          <td>
+            <img src="${p.image_url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100'}" alt="${p.name}" style="width: 44px; height: 44px; border-radius: 6px; object-fit: cover;" onerror="this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100'">
+          </td>
           <td><code>${p.sku}</code></td>
           <td><strong>${p.name}</strong></td>
           <td>${p.category ? p.category.name : '-'}</td>
@@ -282,6 +307,117 @@ class HiraAdminApp {
       `
       )
       .join('');
+  }
+
+  filterCatalog(query) {
+    this.catalogFilter = query;
+    this.renderProducts();
+  }
+
+  openAddProductModal() {
+    this.generateSku();
+    document.getElementById('newProdName').value = '';
+    document.getElementById('newProdPrice').value = '';
+    document.getElementById('newProdMrp').value = '';
+    document.getElementById('newProdDesc').value = '';
+    document.getElementById('newProdImg').value = '';
+    document.getElementById('newProdStock').value = '20';
+    document.getElementById('newProdThreshold').value = '3';
+    document.getElementById('imagePreviewContainer').style.display = 'none';
+    document.getElementById('addProductModal').style.display = 'flex';
+  }
+
+  generateSku() {
+    const cat = (document.getElementById('newProdCategory')?.value || 'GEN').substring(0, 3).toUpperCase();
+    const rand = Math.floor(100 + Math.random() * 900);
+    const sku = `HRA-${cat}-${rand}`;
+    const skuInput = document.getElementById('newProdSku');
+    if (skuInput) skuInput.value = sku;
+    return sku;
+  }
+
+  previewImage(url) {
+    const container = document.getElementById('imagePreviewContainer');
+    const img = document.getElementById('imagePreview');
+    if (url && url.startsWith('http')) {
+      img.src = url;
+      container.style.display = 'block';
+    } else {
+      container.style.display = 'none';
+    }
+  }
+
+  setPresetImage(presetType) {
+    const presets = {
+      apparel: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=600&q=80',
+      saree: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=80',
+      kitchen: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80',
+      home: 'https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=600&q=80',
+    };
+    const url = presets[presetType] || presets.apparel;
+    const input = document.getElementById('newProdImg');
+    if (input) {
+      input.value = url;
+      this.previewImage(url);
+    }
+  }
+
+  async submitAddProduct() {
+    const name = document.getElementById('newProdName').value.trim();
+    const sku = document.getElementById('newProdSku').value.trim();
+    const categoryName = document.getElementById('newProdCategory').value;
+    const priceRupees = parseFloat(document.getElementById('newProdPrice').value);
+    const mrpRupees = parseFloat(document.getElementById('newProdMrp').value) || priceRupees;
+    const taxRate = parseFloat(document.getElementById('newProdTax').value) || 5;
+    const description = document.getElementById('newProdDesc').value.trim();
+    const imageUrl = document.getElementById('newProdImg').value.trim() || 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=600&q=80';
+    const initialStock = parseInt(document.getElementById('newProdStock').value, 10) || 10;
+    const lowStockThreshold = parseInt(document.getElementById('newProdThreshold').value, 10) || 3;
+
+    if (!name || isNaN(priceRupees) || priceRupees <= 0) {
+      alert('Please provide valid product name and selling price.');
+      return;
+    }
+
+    const submitBtn = document.getElementById('submitProductBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving Product & Inventory...';
+
+    try {
+      const payload = {
+        name,
+        sku: sku || undefined,
+        categoryName,
+        price: Math.round(priceRupees * 100), // convert to paise
+        mrp: Math.round(mrpRupees * 100),     // convert to paise
+        tax_rate: taxRate,
+        description,
+        imageUrl,
+        initialStock,
+        lowStockThreshold,
+      };
+
+      const res = await fetch(`${API_BASE}/api/v1/admin/products`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || 'Failed to add product');
+
+      this.closeModal('addProductModal');
+      await this.refreshAllData();
+      alert(`Success! "${name}" (SKU: ${json.data.sku}) added to store catalog with ${initialStock} units stock.`);
+    } catch (err) {
+      alert('Error creating product: ' + err.message);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '🚀 Publish Product & Set Live Stock';
+    }
   }
 
   async toggleAvailability(productId, currentStatus) {

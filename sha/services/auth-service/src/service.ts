@@ -143,6 +143,32 @@ export class AuthService {
     return this.createSession(user, dto.deviceInfo);
   }
 
+  async googleSignIn(dto: { email: string; name?: string; googleId?: string }): Promise<AuthTokens> {
+    const email = dto.email.toLowerCase().trim();
+    let user = await this.repo.findUserByEmail(email);
+    if (!user) {
+      const name = dto.name?.trim() || email.split('@')[0];
+      const passwordHash = hashPassword(`Google_${Math.random().toString(36)}_Secure2026!`);
+      user = await this.repo.createUser({
+        name,
+        email,
+        phone: '+91 9876543210',
+        password_hash: passwordHash,
+        role: 'CUSTOMER',
+        status: 'ACTIVE',
+        email_verified_at: new Date().toISOString(),
+        failed_attempts: 0,
+        locked_until: null,
+      });
+    } else {
+      if (user.status !== 'ACTIVE') {
+        throw new Error('Your account is currently suspended.');
+      }
+    }
+
+    return this.createSession(user);
+  }
+
   async refresh(rawRefreshToken: string): Promise<AuthTokens> {
     const tokenHash = hashToken(rawRefreshToken);
     const storedToken = await this.repo.findRefreshToken(tokenHash);

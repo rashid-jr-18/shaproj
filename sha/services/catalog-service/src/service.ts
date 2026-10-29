@@ -25,6 +25,7 @@ export interface CsvProductRow {
   description: string;
   stock: number;
   low_stock_threshold: number;
+  image_url?: string;
 }
 
 export class CatalogService {
@@ -57,11 +58,13 @@ export class CatalogService {
       };
       const available = Math.max(0, inv.on_hand - inv.reserved);
       const availability = computeAvailability(inv.on_hand, inv.reserved, inv.low_stock_threshold, p.status);
+      const imageUrl = p.images?.[0]?.url || 'https://images.unsplash.com/photo-1597983073493-88cd35cf93b0?auto=format&fit=crop&w=600&q=80';
       return {
         ...p,
+        image_url: imageUrl,
         available_stock: available,
         availability,
-      };
+      } as any;
     });
 
     return { products: projected, total };
@@ -77,12 +80,14 @@ export class CatalogService {
     const inv = inventoryData || { on_hand: 10, reserved: 0, low_stock_threshold: 3 };
     const available = Math.max(0, inv.on_hand - inv.reserved);
     const availability = computeAvailability(inv.on_hand, inv.reserved, inv.low_stock_threshold, p.status);
+    const imageUrl = p.images?.[0]?.url || 'https://images.unsplash.com/photo-1597983073493-88cd35cf93b0?auto=format&fit=crop&w=600&q=80';
 
     return {
       ...p,
+      image_url: imageUrl,
       available_stock: available,
       availability,
-    };
+    } as any;
   }
 
   async createProduct(data: {
@@ -96,9 +101,11 @@ export class CatalogService {
     tax_rate?: number;
     initialStock?: number;
     lowStockThreshold?: number;
+    imageUrl?: string;
   }): Promise<Product> {
     const category = await this.repo.getOrCreateCategory(data.categoryName);
     const slug = data.slug || data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const imgUrl = data.imageUrl || 'https://images.unsplash.com/photo-1597983073493-88cd35cf93b0?auto=format&fit=crop&w=600&q=80';
 
     const product = await this.repo.createProduct({
       sku: data.sku.trim(),
@@ -114,7 +121,7 @@ export class CatalogService {
         {
           id: `img-${Date.now()}`,
           product_id: '',
-          url: `/images/products/${slug}.webp`,
+          url: imgUrl,
           alt: data.name,
           sort_order: 1,
         },
@@ -164,7 +171,17 @@ export class CatalogService {
         continue;
       }
 
-      const [sku, name, slug, category, priceStr, mrpStr, taxStr, desc, stockStr, thresholdStr] = values;
+      const sku = values[0];
+      const name = values[1];
+      const slug = values[2];
+      const category = values[3];
+      const priceStr = values[4];
+      const mrpStr = values[5];
+      const taxStr = values[6];
+      const imageUrl = values.length >= 11 ? values[values.length - 1] : undefined;
+      const thresholdStr = values.length >= 11 ? values[values.length - 2] : values[9];
+      const stockStr = values.length >= 11 ? values[values.length - 3] : values[8];
+      const desc = values.length >= 11 ? values.slice(7, values.length - 3).join(', ') : values[7];
 
       try {
         await this.createProduct({
@@ -178,6 +195,7 @@ export class CatalogService {
           description: desc,
           initialStock: parseInt(stockStr, 10),
           lowStockThreshold: parseInt(thresholdStr, 10),
+          imageUrl: imageUrl || undefined,
         });
         count++;
       } catch (err: any) {

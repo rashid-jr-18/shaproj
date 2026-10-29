@@ -56,7 +56,7 @@ async function initializeStore() {
     for (let i = 1; i < lines.length; i++) {
       const parts = lines[i].split(',').map((p) => p.trim());
       if (parts.length >= 10) {
-        const [sku, name, slug, category, priceStr, mrpStr, taxStr, desc, stockStr, threshStr] = parts;
+        const [sku, name, slug, category, priceStr, mrpStr, taxStr, desc, stockStr, threshStr, imageUrl] = parts;
         try {
           const product = await catalogService.createProduct({
             sku,
@@ -67,6 +67,7 @@ async function initializeStore() {
             mrp: parseInt(mrpStr, 10),
             tax_rate: parseInt(taxStr, 10),
             description: desc,
+            imageUrl: imageUrl || undefined,
           });
 
           await inventoryService.initializeStock(
@@ -151,11 +152,18 @@ export const server = http.createServer(async (req, res) => {
     return serveStaticFile(res, path.resolve(process.cwd(), 'apps/web/public/styles.css'), 'text/css');
   }
 
-  // Admin Frontend
-  if (pathname === '/admin' || pathname === '/admin/' || pathname === '/admin/index.html') {
+  // Owner / Admin Portal Frontend (Private /owner route)
+  if (
+    pathname === '/owner' ||
+    pathname === '/owner/' ||
+    pathname === '/owner/index.html' ||
+    pathname === '/admin' ||
+    pathname === '/admin/' ||
+    pathname === '/admin/index.html'
+  ) {
     return serveStaticFile(res, path.resolve(process.cwd(), 'apps/admin/public/index.html'), 'text/html');
   }
-  if (pathname === '/admin.js') {
+  if (pathname === '/owner.js' || pathname === '/admin.js') {
     return serveStaticFile(res, path.resolve(process.cwd(), 'apps/admin/public/admin.js'), 'application/javascript');
   }
 
@@ -303,6 +311,38 @@ export const server = http.createServer(async (req, res) => {
       const orderId = parts[parts.indexOf('deliver') - 1];
       const updated = await liveOrderService.markAsDelivered(orderId, 'admin');
       sendJson(res, 200, { success: true, data: updated, correlationId }, correlationId);
+      return;
+    }
+
+    // POST /api/v1/admin/products (Add New Product with Full Inventory Integration)
+    if (pathname === '/api/v1/admin/products' && method === 'POST') {
+      const body = await parseJsonBody(req);
+      if (!body.name || !body.price) {
+        sendJson(res, 400, { success: false, code: 'VALIDATION_ERROR', message: 'Product name and price are required.' }, correlationId);
+        return;
+      }
+
+      const product = await catalogService.createProduct({
+        sku: body.sku || `HRA-${Date.now().toString(36).toUpperCase()}`,
+        name: body.name.trim(),
+        slug: body.slug,
+        description: body.description || '',
+        categoryName: body.categoryName || 'Curated',
+        price: Math.round(Number(body.price)), // paise
+        mrp: Math.round(Number(body.mrp) || Number(body.price)),
+        tax_rate: Number(body.tax_rate) || 5,
+        imageUrl: body.imageUrl || 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=600&q=80',
+        initialStock: Number(body.initialStock) || 10,
+        lowStockThreshold: Number(body.lowStockThreshold) || 3,
+      });
+
+      await inventoryService.initializeStock(
+        product.id,
+        Number(body.initialStock) || 10,
+        Number(body.lowStockThreshold) || 3
+      );
+
+      sendJson(res, 201, { success: true, data: product, correlationId }, correlationId);
       return;
     }
 

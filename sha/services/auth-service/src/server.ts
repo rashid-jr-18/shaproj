@@ -96,6 +96,18 @@ export const requestListener: http.RequestListener = async (req, res) => {
       return;
     }
 
+    // Google Sign-In
+    if (pathname === '/api/v1/auth/google' && method === 'POST') {
+      const body = await parseJsonBody(req);
+      if (!body.email) {
+        sendJson(res, 400, { success: false, code: 'VALIDATION_ERROR', message: 'Google email is required.' }, correlationId);
+        return;
+      }
+      const session = await authService.googleSignIn(body);
+      sendJson(res, 200, { success: true, data: session, correlationId }, correlationId);
+      return;
+    }
+
     // Refresh
     if (pathname === '/api/v1/auth/refresh' && method === 'POST') {
       const body = await parseJsonBody(req);

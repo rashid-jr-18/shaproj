@@ -26,6 +26,16 @@ class HiraApp {
     this.updateUserUI();
     await this.fetchCatalog();
     await this.fetchCart();
+
+    // Auto-prompt login modal for new / guest visitors
+    if (!this.token || !this.user) {
+      const dismissed = sessionStorage.getItem('hira_welcome_dismissed');
+      if (!dismissed) {
+        setTimeout(() => {
+          this.openAuthModal(true);
+        }, 700);
+      }
+    }
   }
 
   formatMoney(paise) {
@@ -84,10 +94,12 @@ class HiraApp {
           badgeHtml = `<span class="badge badge-warning">Only ${p.available_stock} left</span>`;
         }
 
+        const imageUrl = p.image_url || p.images?.[0]?.url || 'https://images.unsplash.com/photo-1597983073493-88cd35cf93b0?auto=format&fit=crop&w=600&q=80';
+
         return `
           <div class="product-card" onclick="app.openProductModal('${p.slug}')">
             <div class="product-img-wrapper">
-              <span class="product-img-placeholder">✨</span>
+              <img src="${imageUrl}" alt="${p.name}" class="product-img" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1523381210434-271e8be1f52b?auto=format&fit=crop&w=600&q=80';">
             </div>
             <div class="product-info">
               <div>
@@ -133,6 +145,12 @@ class HiraApp {
     document.getElementById('modalDesc').textContent = product.description;
     document.getElementById('modalPrice').textContent = this.formatMoney(product.price);
     document.getElementById('modalMrp').textContent = product.mrp > product.price ? this.formatMoney(product.mrp) : '';
+
+    const imgEl = document.getElementById('modalImg');
+    if (imgEl) {
+      imgEl.src = product.image_url || product.images?.[0]?.url || 'https://images.unsplash.com/photo-1597983073493-88cd35cf93b0?auto=format&fit=crop&w=600&q=80';
+      imgEl.alt = product.name;
+    }
 
     const btn = document.getElementById('modalAddToCartBtn');
     const badge = document.getElementById('modalBadge');
@@ -222,8 +240,12 @@ class HiraApp {
 
   updateCartCount() {
     const totalCount = this.cart.items.reduce((sum, i) => sum + i.qty, 0);
-    document.getElementById('cartCount').textContent = totalCount;
-    document.getElementById('bottomCartCount').textContent = totalCount;
+    const cartEl = document.getElementById('cartCount');
+    if (cartEl) cartEl.textContent = totalCount;
+    const cartMobileEl = document.getElementById('cartCountMobile');
+    if (cartMobileEl) cartMobileEl.textContent = totalCount;
+    const btmEl = document.getElementById('bottomCartCount');
+    if (btmEl) btmEl.textContent = totalCount;
   }
 
   openCart() {
@@ -366,7 +388,7 @@ class HiraApp {
   }
 
   // --- Auth Modal & Guest Merge ---
-  openAuthModal() {
+  openAuthModal(isAutoPrompt = false) {
     if (this.user) {
       if (confirm(`Logged in as ${this.user.name} (${this.user.email}). Log out?`)) {
         localStorage.removeItem('hira_token');
@@ -377,7 +399,67 @@ class HiraApp {
       }
       return;
     }
+
+    const titleEl = document.getElementById('authModalTitle');
+    const subEl = document.getElementById('authModalSubtitle');
+    if (isAutoPrompt) {
+      if (titleEl) titleEl.textContent = 'Welcome to Hira ✨';
+      if (subEl) subEl.textContent = 'Sign in with Google or create an account to start shopping handcrafted artisanal collections.';
+    } else {
+      if (titleEl) titleEl.textContent = this.isRegisterMode ? 'Create your Hira Account' : 'Sign in to Hira';
+      if (subEl) subEl.textContent = 'Welcome back! Please sign in to access your orders and saved items.';
+    }
+
     document.getElementById('authModal').style.display = 'flex';
+  }
+
+  async loginWithGoogle() {
+    const defaultEmail = 'raseed@gmail.com';
+    const chosenEmail = prompt(
+      'Sign in with Google:\nEnter your Google/Gmail address (or click OK for default demo account):',
+      defaultEmail
+    );
+    if (!chosenEmail) return;
+
+    const email = chosenEmail.trim();
+    const rawName = email.split('@')[0].replace(/[._-]/g, ' ');
+    const name = rawName.charAt(0).toUpperCase() + rawName.slice(1);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name, googleId: `goog_${Date.now()}` }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || 'Google sign-in failed');
+
+      this.token = json.data.accessToken;
+      this.user = json.data.user;
+      localStorage.setItem('hira_token', this.token);
+      localStorage.setItem('hira_user', JSON.stringify(this.user));
+
+      // Merge guest cart into user cart
+      await fetch(`${API_BASE}/api/v1/cart/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          guestCartId: this.cartId,
+          userCartId: `user_cart_${this.user.id}`,
+          userId: this.user.id,
+        }),
+      });
+
+      this.cartId = `user_cart_${this.user.id}`;
+      localStorage.setItem('hira_cart_id', this.cartId);
+      await this.fetchCart();
+
+      this.closeModal('authModal');
+      this.updateUserUI();
+      alert(`Welcome, ${this.user.name}! Successfully signed in with Google.`);
+    } catch (err) {
+      alert('Google Sign-In Error: ' + err.message);
+    }
   }
 
   toggleAuthMode(e) {
@@ -440,18 +522,19 @@ class HiraApp {
     const btn = document.getElementById('authBtn');
     const bottomText = document.getElementById('bottomAccountText');
     if (this.user) {
-      btn.textContent = this.user.name.split(' ')[0];
-      btn.style.display = 'block';
-      bottomText.textContent = this.user.name.split(' ')[0];
+      if (btn) btn.textContent = this.user.name.split(' ')[0];
+      if (bottomText) bottomText.textContent = this.user.name.split(' ')[0];
     } else {
-      btn.textContent = 'Sign in';
-      btn.style.display = 'block';
-      bottomText.textContent = 'Account';
+      if (btn) btn.textContent = 'Sign in';
+      if (bottomText) bottomText.textContent = 'Account';
     }
   }
 
   closeModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
+    if (modalId === 'authModal') {
+      sessionStorage.setItem('hira_welcome_dismissed', 'true');
+    }
   }
 
   showCatalog() {

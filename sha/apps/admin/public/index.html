@@ -90,8 +90,16 @@
 
   <!-- Top Bar -->
   <header class="admin-nav">
-    <div class="admin-logo">Hira Store Owner<span>.</span> (Control Panel)</div>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <div class="admin-logo">Hira Store Owner<span>.</span> (Private /owner Portal)</div>
+      <a href="/" target="_blank" style="color: rgba(255,255,255,0.85); font-size: 13px; text-decoration: underline;">
+        ↗ View Customer Storefront
+      </a>
+    </div>
     <div id="adminUserArea" style="display: flex; gap: 12px; align-items: center;">
+      <button class="btn-accent" style="padding: 6px 14px; font-weight: 700; font-size: 14px;" onclick="admin.openAddProductModal()">
+        + Add New Product
+      </button>
       <span id="adminGreeting" style="font-size: 14px;">Store Owner</span>
       <button class="btn-outline" style="color: #fff; border-color: rgba(255,255,255,0.3); padding: 6px 12px; min-height: 36px;" onclick="admin.logout()">Logout</button>
     </div>
@@ -99,9 +107,28 @@
 
   <!-- Login Modal with 2FA -->
   <div id="adminLoginModal" class="modal-overlay" style="display: none;">
-    <div class="modal-sheet" style="max-width: 400px; text-align: left;">
-      <h2 style="margin-bottom: 8px;">Admin Login with 2FA</h2>
-      <p style="color: var(--hira-text-muted); font-size: 14px; margin-bottom: 20px;">Mandatory TOTP two-factor authentication enforced (OWASP A07).</p>
+    <div class="modal-sheet" style="max-width: 440px; text-align: left;">
+      <h2 style="margin-bottom: 6px;">Hira Store Owner Portal</h2>
+      <p style="color: var(--hira-text-muted); font-size: 13px; margin-bottom: 16px;">Secure store owner administrative gateway.</p>
+
+      <!-- Credentials Helper Box -->
+      <div style="background: #E8F0F2; border: 1px solid #D1E0E3; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; font-size: 13px;">
+        <div style="font-weight: 700; color: var(--hira-primary); margin-bottom: 4px;">🔑 Store Owner Credentials:</div>
+        <div><strong>Email:</strong> <code>admin@hira.in</code></div>
+        <div><strong>Password:</strong> <code>HiraAdminSecure2026!</code></div>
+      </div>
+
+      <!-- Quick 1-Click Login Button -->
+      <button type="button" class="btn-accent" style="width: 100%; margin-bottom: 16px; padding: 10px; font-weight: 700; cursor: pointer;" onclick="admin.quickDemoLogin()">
+        ⚡ 1-Click Sign In as Store Owner
+      </button>
+
+      <div style="display: flex; align-items: center; text-align: center; color: var(--hira-text-muted); font-size: 12px; margin-bottom: 16px;">
+        <span style="flex: 1; border-bottom: 1px solid var(--hira-border);"></span>
+        <span style="padding: 0 10px;">or manual sign-in</span>
+        <span style="flex: 1; border-bottom: 1px solid var(--hira-border);"></span>
+      </div>
+
       <form onsubmit="event.preventDefault(); admin.login();">
         <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px;">
           <div>
@@ -116,7 +143,7 @@
             <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">6-digit TOTP 2FA Code</label>
             <input type="text" id="admTotp" placeholder="Enter 6-digit code" maxlength="6" required>
             <div style="font-size: 12px; color: var(--hira-primary); margin-top: 4px; cursor: pointer;" onclick="admin.fetchCurrent2FaCode()">
-              🔑 [Demo: Click to autofill current 2FA code]
+              🔑 [Click here to autofill live 2FA code]
             </div>
           </div>
         </div>
@@ -187,19 +214,28 @@
 
     <!-- TAB 3: Product Catalog Management -->
     <section id="tabProducts" style="display: none;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h3>Store Catalog (50 Initial Products)</h3>
-        <input type="text" placeholder="Search catalog..." style="max-width: 280px;" oninput="admin.filterCatalog(this.value)">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h3>Store Catalog Management</h3>
+          <p style="font-size: 13px; color: var(--hira-text-muted);">Manage product listings, pricing, live stock, and catalog availability.</p>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="text" placeholder="Search products or SKU..." style="max-width: 240px;" oninput="admin.filterCatalog(this.value)">
+          <button class="btn-primary" style="padding: 8px 16px;" onclick="admin.openAddProductModal()">
+            + Add New Product
+          </button>
+        </div>
       </div>
       <table class="data-table">
         <thead>
           <tr>
+            <th>Photo</th>
             <th>SKU</th>
             <th>Product Name</th>
             <th>Category</th>
-            <th>Price</th>
-            <th>Stock (Available)</th>
-            <th>Availability</th>
+            <th>Selling Price</th>
+            <th>Stock Status</th>
+            <th>Visibility</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -226,6 +262,101 @@
       </table>
     </section>
   </main>
+
+  <!-- Add New Product Modal (Full End-to-End Detail Form) -->
+  <div id="addProductModal" class="modal-overlay" style="display: none;" onclick="if(event.target===this) admin.closeModal('addProductModal')">
+    <div class="modal-sheet" style="max-width: 600px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3>Add New Product to Store</h3>
+        <button style="background: none; border: none; font-size: 20px; cursor: pointer;" onclick="admin.closeModal('addProductModal')">✕</button>
+      </div>
+      <form onsubmit="event.preventDefault(); admin.submitAddProduct();">
+        <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px;">
+          <div>
+            <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">Product Name *</label>
+            <input type="text" id="newProdName" placeholder="e.g. Handcrafted Brass Filter Coffee Cup" required>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+              <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">SKU Code *</label>
+              <div style="display: flex; gap: 6px;">
+                <input type="text" id="newProdSku" placeholder="e.g. HRA-KIT-099" required>
+                <button type="button" class="btn-outline" style="padding: 4px 8px; font-size: 12px; white-space: nowrap;" onclick="admin.generateSku()">Generate</button>
+              </div>
+            </div>
+            <div>
+              <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">Category *</label>
+              <select id="newProdCategory" required>
+                <option value="Apparel">Apparel</option>
+                <option value="Sarees">Sarees</option>
+                <option value="Home & Living">Home & Living</option>
+                <option value="Kitchen">Kitchen</option>
+                <option value="Food & Beverages">Food & Beverages</option>
+                <option value="Wellness">Wellness</option>
+                <option value="Accessories">Accessories</option>
+                <option value="Stationery">Stationery</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+            <div>
+              <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">Selling Price (₹) *</label>
+              <input type="number" id="newProdPrice" min="1" step="0.01" placeholder="e.g. 1499" required>
+            </div>
+            <div>
+              <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">MRP (₹) *</label>
+              <input type="number" id="newProdMrp" min="1" step="0.01" placeholder="e.g. 2199" required>
+            </div>
+            <div>
+              <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">GST Rate (%)</label>
+              <select id="newProdTax">
+                <option value="5">5% (Standard Handloom/Apparel)</option>
+                <option value="12">12% (Living/Processed Food)</option>
+                <option value="18">18% (Metalware/Lifestyle)</option>
+                <option value="0">0% (Nil)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">Product Description *</label>
+            <textarea id="newProdDesc" rows="3" placeholder="Describe the materials, craftsmanship, dimensions, and care instructions..." required></textarea>
+          </div>
+
+          <div>
+            <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">Image URL</label>
+            <input type="url" id="newProdImg" placeholder="https://images.unsplash.com/photo-..." oninput="admin.previewImage(this.value)">
+            <div style="display: flex; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--hira-primary); cursor: pointer;">
+              <span onclick="admin.setPresetImage('apparel')">Preset: Apparel</span> ·
+              <span onclick="admin.setPresetImage('saree')">Preset: Saree</span> ·
+              <span onclick="admin.setPresetImage('kitchen')">Preset: Kitchen</span> ·
+              <span onclick="admin.setPresetImage('home')">Preset: Home</span>
+            </div>
+            <div id="imagePreviewContainer" style="margin-top: 8px; display: none; height: 120px; border-radius: 6px; overflow: hidden; border: 1px solid var(--hira-border);">
+              <img id="imagePreview" src="" alt="Preview" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div>
+              <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">Initial Stock Quantity (Units) *</label>
+              <input type="number" id="newProdStock" min="0" value="20" required>
+            </div>
+            <div>
+              <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px;">Low-Stock Alert Level</label>
+              <input type="number" id="newProdThreshold" min="1" value="3" required>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" id="submitProductBtn" class="btn-primary" style="width: 100%; padding: 12px; font-size: 16px;">
+          🚀 Publish Product & Set Live Stock
+        </button>
+      </form>
+    </div>
+  </div>
 
   <!-- Restock Modal -->
   <div id="restockModal" class="modal-overlay" style="display: none;" onclick="if(event.target===this) admin.closeModal('restockModal')">

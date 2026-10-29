@@ -150,7 +150,7 @@ button:active {
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px 16px 80px 16px;
+  padding: 20px 16px 40px 16px;
 }
 
 /* Category Pills */
@@ -233,6 +233,17 @@ button:active {
   overflow: hidden;
 }
 
+.product-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.product-card:hover .product-img {
+  transform: scale(1.05);
+}
+
 .product-img-placeholder {
   font-size: 32px;
   color: var(--hira-primary);
@@ -299,7 +310,36 @@ button:active {
 .badge-warning { background: #FEF3D6; color: var(--hira-warning); }
 .badge-danger { background: #FCE8E6; color: var(--hira-danger); }
 
-/* Bottom Bar (Mobile First Navigation) */
+/* Desktop Top Nav Links */
+.desktop-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.desktop-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--hira-text);
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: background 0.15s ease, color 0.15s ease;
+  min-height: 40px;
+}
+
+.desktop-nav-link:hover {
+  background: #EAECE9;
+  color: var(--hira-primary);
+}
+
+/* Bottom Bar (Mobile Only - Completely hidden on Desktop & Tablets) */
 .bottom-nav {
   position: fixed;
   bottom: 0;
@@ -311,6 +351,15 @@ button:active {
   display: flex;
   justify-content: space-around;
   padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px)) 12px;
+}
+
+@media (min-width: 600px) {
+  .bottom-nav {
+    display: none !important;
+  }
+  body {
+    padding-bottom: 20px;
+  }
 }
 
 .bottom-nav-item {
