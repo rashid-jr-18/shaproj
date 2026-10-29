@@ -118,8 +118,9 @@ function parseJsonBody(req: http.IncomingMessage): Promise<any> {
 
 function serveStaticFile(res: http.ServerResponse, filePath: string, contentType: string) {
   if (fs.existsSync(filePath)) {
+    const data = fs.readFileSync(filePath);
     res.writeHead(200, { 'Content-Type': contentType });
-    fs.createReadStream(filePath).pipe(res);
+    res.end(data);
   } else {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('File not found');

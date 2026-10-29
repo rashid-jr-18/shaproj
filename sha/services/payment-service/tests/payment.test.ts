@@ -98,4 +98,19 @@ describe('Payment Service & Webhook Security Tests', () => {
     const updatedPayment = await repo.getPaymentById(payment.id);
     assert.strictEqual(updatedPayment?.status, 'REFUNDED');
   });
+
+  it('should reject refund on non-successful payments (OWASP ASVS Level 2)', async () => {
+    const pendingPayment = await repo.createPayment({
+      order_id: 'order-pending-test',
+      gateway: 'RAZORPAY',
+      amount: 50000,
+      currency: 'INR',
+      status: 'PENDING',
+    });
+
+    await assert.rejects(
+      () => service.processRefund(pendingPayment.id, 50000, 'Premature refund attempt'),
+      /Only successful payments can be refunded/i
+    );
+  });
 });

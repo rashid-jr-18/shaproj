@@ -162,4 +162,52 @@ describe('Auth Service & Security Baseline Tests', () => {
     const deletedByOwner = await service.deleteAddress(user.id, addr.id);
     assert.strictEqual(deletedByOwner, true, 'Owner should be able to delete own address');
   });
+
+  it('should enforce password minimum length (OWASP ASVS)', async () => {
+    await assert.rejects(
+      () =>
+        service.register({
+          name: 'Short Pass',
+          email: 'short@example.com',
+          phone: '+919999999998',
+          password: 'short', // < 8 characters
+        }),
+      /Password must be at least 8 characters/i
+    );
+  });
+
+  it('should seamlessly authenticate Google users via 1-Click OAuth (new & existing)', async () => {
+    // 1. New Google user -> auto-creates CUSTOMER account
+    const googleEmail = 'raseed@gmail.com';
+    const newSession = await service.googleSignIn({
+      email: googleEmail,
+      name: 'Raseed',
+      googleId: 'goog-123456',
+    });
+
+    assert.ok(newSession.accessToken);
+    assert.ok(newSession.refreshToken);
+    assert.strictEqual(newSession.user.email, googleEmail);
+    assert.strictEqual(newSession.user.name, 'Raseed');
+    assert.strictEqual(newSession.user.role, 'CUSTOMER');
+    const storedUser = await repo.findUserById(newSession.user.id);
+    assert.strictEqual(storedUser?.status, 'ACTIVE');
+
+    // 2. Existing Google user -> returns session for existing user without duplicate error
+    const existingSession = await service.googleSignIn({
+      email: googleEmail,
+      name: 'Raseed Updated',
+    });
+    assert.strictEqual(existingSession.user.id, newSession.user.id);
+    assert.ok(existingSession.accessToken);
+
+    // 3. Suspended user cannot sign in with Google
+    await repo.updateUser(newSession.user.id, { status: 'SUSPENDED' });
+    await assert.rejects(
+      () => service.googleSignIn({ email: googleEmail }),
+      /account is currently suspended/i
+    );
+    // Restore
+    await repo.updateUser(newSession.user.id, { status: 'ACTIVE' });
+  });
 });

@@ -160,5 +160,35 @@ describe('Inventory Service & Concurrency Tests', () => {
     assert.strictEqual(adjusted.on_hand, 6);
     assert.strictEqual(adjusted.reserved, 4);
   });
+
+  it('should reject negative stock and maintain complete movement audit trail (Section 3.5)', async () => {
+    const repo = new InMemoryInventoryRepository();
+    const service = new InventoryService(repo);
+
+    const testItem = 'prod-audit-trail-test';
+    await service.initializeStock(testItem, 20);
+
+    // Negative stock is strictly impossible
+    await assert.rejects(
+      () => service.adjustStock(testItem, -5, 'Invalid negative count', 'admin-1'),
+      /Stock cannot be negative/i
+    );
+
+    // Restock +5
+    await service.restock(testItem, 5, 'Shipment intake', 'admin-1');
+
+    // Reserve 3
+    await service.reserveCart('order-audit-1', [{ productId: testItem, qty: 3 }]);
+
+    // Release 3
+    await service.releaseReservation('order-audit-1', 'Order cancelled');
+
+    // Check movements log
+    const movements = await service.getMovements(testItem);
+    assert.ok(movements.length >= 4, 'All movements must be recorded in stock_movements ledger');
+    assert.ok(movements.some((m) => m.type === 'RESTOCK' && m.qty_change === 5));
+    assert.ok(movements.some((m) => m.type === 'RESERVATION_HOLD' && m.qty_change === -3));
+    assert.ok(movements.some((m) => m.type === 'RESERVATION_RELEASE' && m.qty_change === 3));
+  });
 });
 

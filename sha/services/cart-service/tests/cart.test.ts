@@ -97,5 +97,34 @@ describe('Cart Service & Guest Cart Merging Tests', () => {
     const oldGuest = await repo.getCart(guestCartId);
     assert.strictEqual(oldGuest, null);
   });
+
+  it('should clear cart completely and handle negative quantity updates gracefully', async () => {
+    const cartId = 'cart-clear-test';
+    await service.addItem(cartId, {
+      product_id: 'prod-clear-1',
+      sku: 'HRA-CLR-001',
+      name: 'Clear Test Item',
+      price: 99900,
+      qty: 2,
+    });
+
+    // Negative quantity update removes item
+    let cart = await service.updateItemQty(cartId, 'prod-clear-1', -1);
+    assert.strictEqual(cart.items.length, 0);
+    assert.strictEqual(cart.subtotal, 0);
+
+    // Re-add and clearCart
+    await service.addItem(cartId, {
+      product_id: 'prod-clear-2',
+      sku: 'HRA-CLR-002',
+      name: 'Item 2',
+      price: 50000,
+      qty: 1,
+    });
+    await service.clearCart(cartId);
+    const cleared = await service.getOrCreateCart(cartId);
+    assert.strictEqual(cleared.items.length, 0);
+    assert.strictEqual(cleared.subtotal, 0);
+  });
 });
 

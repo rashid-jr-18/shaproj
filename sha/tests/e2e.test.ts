@@ -36,7 +36,11 @@ function mockRequest(
     const res = {
       writeHead: (status: number, headersObj: any) => {
         statusCode = status;
-        if (headersObj) Object.assign(resHeaders, headersObj);
+        if (headersObj) {
+          for (const [k, v] of Object.entries(headersObj)) {
+            resHeaders[k.toLowerCase()] = v;
+          }
+        }
       },
       setHeader: (key: string, val: any) => {
         resHeaders[key.toLowerCase()] = val;
@@ -194,5 +198,74 @@ describe('Hira Complete End-to-End System Tests', () => {
     );
     assert.strictEqual(restockRes.statusCode, 200);
     assert.ok(restockRes.body.data.on_hand > 15);
+  });
+
+  it('should authenticate user automatically via Google Sign-In endpoint', async () => {
+    const googleRes = await mockRequest(
+      'POST',
+      '/api/v1/auth/google',
+      {},
+      {
+        email: 'raseed@gmail.com',
+        name: 'Raseed',
+        googleId: 'goog-test-999',
+      }
+    );
+
+    assert.strictEqual(googleRes.statusCode, 200);
+    assert.strictEqual(googleRes.body.success, true);
+    assert.ok(googleRes.body.data.accessToken);
+    assert.strictEqual(googleRes.body.data.user.email, 'raseed@gmail.com');
+    assert.strictEqual(googleRes.body.data.user.name, 'Raseed');
+    assert.strictEqual(googleRes.body.data.user.role, 'CUSTOMER');
+  });
+
+  it('should add new product end-to-end via POST /api/v1/admin/products and reflect in customer catalog', async () => {
+    // 1. Store Owner adds product
+    const admin2fa = authService.getAdminCurrentTotp('00000000-0000-0000-0000-000000000001');
+    const loginRes = await mockRequest('POST', '/api/v1/auth/login', {}, {
+      email: 'admin@hira.in',
+      password: 'HiraAdminSecure2026!',
+      totpCode: admin2fa,
+    });
+    const adminToken = loginRes.body.data.accessToken;
+
+    const newProdSku = `HRA-TST-${Date.now().toString().slice(-4)}`;
+    const addProdRes = await mockRequest(
+      'POST',
+      '/api/v1/admin/products',
+      { authorization: `Bearer ${adminToken}` },
+      {
+        name: 'Handcrafted Terracotta Chai Jug',
+        sku: newProdSku,
+        categoryName: 'Kitchen',
+        price: 89900, // ₹899
+        mrp: 129900,  // ₹1,299
+        tax_rate: 12,
+        description: 'Authentic clay beverage jug.',
+        imageUrl: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd',
+        initialStock: 25,
+        lowStockThreshold: 4,
+      }
+    );
+
+    assert.strictEqual(addProdRes.statusCode, 201);
+    assert.strictEqual(addProdRes.body.data.sku, newProdSku);
+    const createdId = addProdRes.body.data.id;
+
+    // 2. Product immediately reflects in customer listing with live stock
+    const catRes = await mockRequest('GET', '/api/v1/products?limit=100');
+    assert.strictEqual(catRes.statusCode, 200);
+    const found = catRes.body.data.find((p: any) => p.sku === newProdSku);
+    assert.ok(found, 'New product must be visible in customer catalog');
+    assert.strictEqual(found.available_stock, 25, 'Initial stock must be accurately initialized');
+    assert.strictEqual(found.price, 89900);
+  });
+
+  it('should serve private /owner portal route', async () => {
+    const ownerPageRes = await mockRequest('GET', '/owner');
+    assert.strictEqual(ownerPageRes.statusCode, 200);
+    assert.strictEqual(ownerPageRes.headers['content-type'], 'text/html');
+    assert.ok(typeof ownerPageRes.body === 'string' && ownerPageRes.body.includes('Hira Store Owner'));
   });
 });

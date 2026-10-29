@@ -190,5 +190,42 @@ describe('Order Service & State Machine Lifecycle Tests', () => {
       /limited to orders up to ₹5,000/i
     );
   });
+
+  it('should enforce return request eligibility: DELIVERED only, with user ownership check', async () => {
+    // 1. Order in PENDING_PAYMENT -> return request should be rejected
+    const newOrder = await service.placeOrder({
+      userId: 'user-priya',
+      items: [{ productId: 'prod-kurta', qty: 1 }],
+      address: sampleAddress,
+      paymentMethod: 'RAZORPAY',
+      idempotencyKey: 'idem-return-test-01',
+    });
+
+    await assert.rejects(
+      () => service.requestReturn(newOrder.id, 'Wrong size', 'user-priya'),
+      /Only delivered orders can be returned/i
+    );
+
+    // 2. Deliver the order
+    await service.confirmPayment(newOrder.id);
+    await service.startProcessing(newOrder.id, 'admin-1');
+    await service.markAsShipped(newOrder.id, 'Delhivery', 'DLH-RETURN', 'admin-1');
+    await service.markAsDelivered(newOrder.id, 'admin-1');
+
+    // 3. Unauthorized user cannot request return
+    await assert.rejects(
+      () => service.requestReturn(newOrder.id, 'Wrong size', 'other-intruder'),
+      /unauthorized/i
+    );
+
+    // 4. Legitimate customer requests return -> success
+    const ret = await service.requestReturn(newOrder.id, 'Size too large', 'user-priya');
+    assert.ok(ret.id);
+    assert.strictEqual(ret.status, 'REQUESTED');
+    assert.strictEqual(ret.refund_amount, newOrder.total);
+
+    const updated = await service.getOrder(newOrder.id);
+    assert.strictEqual(updated?.status, 'RETURN_REQUESTED');
+  });
 });
 
