@@ -10,6 +10,27 @@ import * as http from 'node:http';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+// Automatically load .env configuration if present
+const envPath = path.resolve(process.cwd(), '.env');
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf8');
+  for (const line of envContent.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx > 0) {
+      const key = trimmed.slice(0, eqIdx).trim();
+      let val = trimmed.slice(eqIdx + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (!process.env[key]) {
+        process.env[key] = val;
+      }
+    }
+  }
+}
+
 // Microservices Singletons
 import { authService, requestListener as authHandler } from './services/auth-service/src/server.ts';
 import { catalogService, catalogRepo } from './services/catalog-service/src/server.ts';
@@ -380,11 +401,11 @@ export const server = http.createServer(async (req, res) => {
 const isTest = process.env.NODE_ENV === 'test' || process.argv.includes('--test') || Boolean(process.env.NODE_TEST_CONTEXT);
 
 if (!isTest) {
-  server.listen(PORT, () => {
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`=======================================================`);
     console.log(`🌟 HIRA E-COMMERCE PLATFORM RUNNING ON PORT ${PORT}`);
     console.log(`🛍️ Customer Web App: http://localhost:${PORT}`);
-    console.log(`👑 Store Owner Admin: http://localhost:${PORT}/admin`);
+    console.log(`👑 Store Owner Admin: http://localhost:${PORT}/owner`);
     console.log(`🔌 API Gateway Base:  http://localhost:${PORT}/api/v1`);
     console.log(`=======================================================`);
   });

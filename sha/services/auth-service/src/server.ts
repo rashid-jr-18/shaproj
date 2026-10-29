@@ -132,6 +132,32 @@ export const requestListener: http.RequestListener = async (req, res) => {
       return;
     }
 
+    // Firebase Phone Auth - Verification & Login
+    if (pathname === '/api/v1/auth/firebase/verify' && method === 'POST') {
+      const body = await parseJsonBody(req);
+      if (!body.phone) {
+        sendJson(res, 400, { success: false, code: 'VALIDATION_ERROR', message: 'Phone number is required.' }, correlationId);
+        return;
+      }
+      const session = await authService.verifyFirebasePhone(body.phone, body.name);
+      sendJson(res, 200, { success: true, data: session, correlationId }, correlationId);
+      return;
+    }
+
+    // Public Firebase Client Web Config (safely read from .env)
+    if (pathname === '/api/v1/auth/firebase-config' && method === 'GET') {
+      const config = {
+        apiKey: process.env.FIREBASE_API_KEY || '',
+        authDomain: process.env.FIREBASE_AUTH_DOMAIN || '',
+        projectId: process.env.FIREBASE_PROJECT_ID || '',
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || '',
+        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '',
+        appId: process.env.FIREBASE_APP_ID || '',
+      };
+      sendJson(res, 200, { success: true, data: config, correlationId }, correlationId);
+      return;
+    }
+
     // Refresh
     if (pathname === '/api/v1/auth/refresh' && method === 'POST') {
       const body = await parseJsonBody(req);

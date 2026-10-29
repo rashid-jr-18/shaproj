@@ -245,4 +245,21 @@ describe('Auth Service & Security Baseline Tests', () => {
     assert.strictEqual(loginAgain.isNewUser, false);
     assert.strictEqual(loginAgain.user.id, verifyRes.user.id);
   });
+
+  it('should authenticate user via Firebase Phone Auth verification endpoint', async () => {
+    const fbPhone = '9123456780';
+
+    // 1. New user registration via Firebase verified phone
+    const newSession = await service.verifyFirebasePhone(fbPhone, 'Raseed Firebase');
+    assert.ok(newSession.accessToken);
+    assert.strictEqual(newSession.isNewUser, true);
+    assert.strictEqual(newSession.user.phone, `+91${fbPhone}`);
+    assert.strictEqual(newSession.user.name, 'Raseed Firebase');
+    assert.strictEqual(newSession.user.role, 'CUSTOMER');
+
+    // 2. Existing user login via Firebase verified phone
+    const existingSession = await service.verifyFirebasePhone(fbPhone);
+    assert.strictEqual(existingSession.isNewUser, false);
+    assert.strictEqual(existingSession.user.id, newSession.user.id);
+  });
 });

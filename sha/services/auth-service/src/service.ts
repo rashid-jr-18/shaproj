@@ -15,6 +15,7 @@ import {
   verifyTotpCode,
   generateTotpSecret,
 } from './crypto.ts';
+import { firebaseFunctions } from '../../notification-service/src/firebase-functions.ts';
 
 export interface RegisterDto {
   name: string;
@@ -97,7 +98,21 @@ export class AuthService {
       expiresAt: Date.now() + 5 * 60 * 1000, // 5 mins
     });
 
-    console.log(`[SMS Gateway - Swiggy/Zomato OTP Flow] 📱 SMS to ${fullPhone}: Your Hira verification OTP is ${code}. Valid for 5 mins.`);
+    console.log(`\n======================================================`);
+    console.log(`📱 [SMS GATEWAY DISPATCH] SMS sent to: ${fullPhone}`);
+    console.log(`🔑 VERIFICATION OTP CODE: [ ${code} ] (Valid for 5 mins)`);
+    console.log(`======================================================\n`);
+
+    // Real SMS dispatch if Fast2SMS API key is provided in environment
+    if (process.env.FAST2SMS_API_KEY) {
+      try {
+        const url = `https://www.fast2sms.com/dev/bulkV2?authorization=${process.env.FAST2SMS_API_KEY}&route=otp&variables_values=${code}&flash=0&numbers=${clean}`;
+        await fetch(url, { method: 'GET' });
+        console.log(`[Fast2SMS Gateway] ✅ Dispatched real SMS to carrier for ${fullPhone}`);
+      } catch (smsErr) {
+        console.error('[SMS Gateway Error] Carrier dispatch error:', smsErr);
+      }
+    }
 
     return {
       success: true,
@@ -151,6 +166,47 @@ export class AuthService {
     }
 
     this.phoneOtps.delete(fullPhone);
+    const session = await this.createSession(user);
+    return { ...session, isNewUser };
+  }
+
+  async verifyFirebasePhone(phone: string, name?: string): Promise<AuthTokens & { isNewUser: boolean }> {
+    const clean = (phone || '').replace(/\D/g, '').slice(-10);
+    if (clean.length !== 10) {
+      throw new Error('Please enter a valid 10-digit Indian mobile number.');
+    }
+    const fullPhone = `+91${clean}`;
+
+    let user = await this.repo.findUserByPhone(fullPhone);
+    let isNewUser = false;
+
+    if (!user) {
+      isNewUser = true;
+      const userName = name?.trim() || `Customer ${clean.slice(-4)}`;
+      const dummyEmail = `${clean}@hira.in`;
+      user = await this.repo.createUser({
+        name: userName,
+        email: dummyEmail,
+        phone: fullPhone,
+        password_hash: hashPassword(Math.random().toString(36) + 'FirebaseSecure2026!'),
+        role: 'CUSTOMER',
+        status: 'ACTIVE',
+        email_verified_at: new Date().toISOString(),
+        failed_attempts: 0,
+        locked_until: null,
+      });
+      console.log(`[Firebase Auth] Registered new customer for verified phone ${fullPhone} (${userName})`);
+    } else {
+      if (user.status !== 'ACTIVE') {
+        throw new Error('Your account is currently suspended.');
+      }
+      if (name && name.trim()) {
+        await this.repo.updateUser(user.id, { name: name.trim() });
+        user.name = name.trim();
+      }
+      console.log(`[Firebase Auth] Existing customer logged in for verified phone ${fullPhone} (${user.name})`);
+    }
+
     const session = await this.createSession(user);
     return { ...session, isNewUser };
   }

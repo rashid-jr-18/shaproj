@@ -300,4 +300,22 @@ describe('Hira Complete End-to-End System Tests', () => {
     assert.ok(verifyRes.body.data.accessToken);
     assert.strictEqual(verifyRes.body.data.user.phone, `+91${customerPhone}`);
   });
+
+  it('should authenticate user via Firebase verified mobile endpoint (POST /api/v1/auth/firebase/verify)', async () => {
+    const fbPhone = '9988776655';
+    const res = await mockRequest(
+      'POST',
+      '/api/v1/auth/firebase/verify',
+      {},
+      {
+        phone: fbPhone,
+        name: 'Raseed Firebase E2E',
+      }
+    );
+    assert.strictEqual(res.statusCode, 200);
+    assert.strictEqual(res.body.success, true);
+    assert.ok(res.body.data.accessToken);
+    assert.strictEqual(res.body.data.user.phone, `+91${fbPhone}`);
+    assert.strictEqual(res.body.data.user.name, 'Raseed Firebase E2E');
+  });
 });

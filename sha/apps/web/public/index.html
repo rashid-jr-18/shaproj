@@ -218,13 +218,16 @@
       
       <!-- STEP 1: Enter Mobile Number (Default Swiggy/Zomato screen) -->
       <div id="mobileStep1">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
           <div>
             <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 4px; color: var(--hira-text);">Login / Sign up</h2>
             <p style="font-size: 13px; color: var(--hira-text-muted);">Enter your mobile number to get an OTP</p>
           </div>
           <button style="background: none; border: none; font-size: 22px; cursor: pointer; color: var(--hira-text-muted);" onclick="app.closeModal('authModal')">✕</button>
         </div>
+
+        <!-- Invisible Recaptcha Container required by Firebase -->
+        <div id="recaptcha-container"></div>
 
         <form onsubmit="event.preventDefault(); app.submitSendOtp();">
           <div style="margin-bottom: 16px;">
@@ -280,17 +283,9 @@
         </div>
 
         <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 4px;">Verify Mobile</h2>
-        <p style="font-size: 13px; color: var(--hira-text-muted); margin-bottom: 16px;">
+        <p style="font-size: 13px; color: var(--hira-text-muted); margin-bottom: 20px;">
           Enter 6-digit OTP sent via SMS to <strong id="otpDisplayPhone">+91 98765 43210</strong>
         </p>
-
-        <!-- Autofill Demo OTP Helper Pill -->
-        <div id="demoOtpPill" onclick="app.autofillDemoOtp()" style="display: flex; align-items: center; justify-content: space-between; background: #E8F0F2; border: 1px solid #D1E0E3; border-radius: 6px; padding: 8px 12px; margin-bottom: 16px; cursor: pointer;">
-          <span style="font-size: 13px; color: var(--hira-primary); font-weight: 600;">
-            📱 Received SMS: <code id="demoOtpCode" style="font-size: 14px; background: #fff; padding: 2px 6px; border-radius: 4px; font-weight: 700;">123456</code>
-          </span>
-          <span style="font-size: 12px; color: var(--hira-primary); text-decoration: underline; font-weight: 700;">Click to autofill</span>
-        </div>
 
         <form onsubmit="event.preventDefault(); app.submitVerifyOtp();">
           <div style="margin-bottom: 16px;">
@@ -357,6 +352,9 @@
     </div>
   </div>
 
+  <!-- Firebase v10 Compat SDKs for Real Phone SMS Authentication -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

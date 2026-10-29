@@ -28,7 +28,7 @@ export function applySecurityHeaders(res: http.ServerResponse) {
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' https: fonts.gstatic.com;"
+    "default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com https://www.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https: fonts.gstatic.com; connect-src 'self' https:; frame-src 'self' https://*.firebaseapp.com https://www.google.com https://recaptcha.google.com;"
   );
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');

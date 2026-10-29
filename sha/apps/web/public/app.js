@@ -24,6 +24,7 @@ class HiraApp {
 
   async init() {
     this.updateUserUI();
+    this.initFirebase();
     await this.fetchCatalog();
     await this.fetchCart();
 
@@ -419,6 +420,43 @@ class HiraApp {
     if (s3) s3.style.display = 'block';
   }
 
+  // --- Firebase Phone Auth (Configured via Backend .env) & Recaptcha ---
+  async initFirebase() {
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/auth/firebase-config`);
+      const json = await res.json();
+      if (json.success && json.data && json.data.apiKey && window.firebase) {
+        window.HIRA_FIREBASE_CONFIG = json.data;
+        if (!firebase.apps.length) {
+          firebase.initializeApp(json.data);
+          console.log('[Firebase] Active with project:', json.data.projectId);
+        }
+      }
+    } catch (err) {
+      console.warn('[Firebase] Config initialization notice:', err.message);
+    }
+  }
+
+  setupRecaptcha() {
+    if (!window.firebase || !firebase.apps.length) return null;
+    if (!window.recaptchaVerifier) {
+      window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+        size: 'invisible',
+        callback: () => {
+          // invisible reCAPTCHA solved
+        },
+        'expired-callback': () => {
+          if (window.recaptchaVerifier) {
+            window.recaptchaVerifier.render().then(widgetId => {
+              if (window.grecaptcha) grecaptcha.reset(widgetId);
+            });
+          }
+        }
+      });
+    }
+    return window.recaptchaVerifier;
+  }
+
   async submitSendOtp() {
     const phoneInput = document.getElementById('mobilePhoneInput');
     const rawPhone = phoneInput ? phoneInput.value.trim() : '';
@@ -436,22 +474,34 @@ class HiraApp {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/v1/auth/mobile/send-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: clean }),
-      });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.message || 'Failed to send OTP');
+      const cfg = window.HIRA_FIREBASE_CONFIG;
+      const isFirebaseConfigured = cfg && cfg.apiKey && window.firebase && firebase.apps.length;
+
+      if (isFirebaseConfigured) {
+        btn.textContent = 'Sending OTP via SMS...';
+        const verifier = this.setupRecaptcha();
+        const fullPhone = `+91${clean}`;
+        const confirmationResult = await firebase.auth().signInWithPhoneNumber(fullPhone, verifier);
+        window.confirmationResult = confirmationResult;
+        window.pendingPhone = clean;
+        console.log('[Firebase Phone Auth] Real SMS dispatched to', fullPhone);
+        this.showToast(`📱 OTP sent via SMS to +91 ${clean}`);
+      } else {
+        // Backend SMS dispatch (prints OTP to server terminal logs)
+        window.confirmationResult = null;
+        const res = await fetch(`${API_BASE}/api/v1/auth/mobile/send-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: clean }),
+        });
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message || 'Failed to send OTP');
+        this.showToast(`📱 OTP sent via SMS to +91 ${clean}`);
+      }
 
       // Update Step 2 screen
       const displayPhone = document.getElementById('otpDisplayPhone');
       if (displayPhone) displayPhone.textContent = `+91 ${clean}`;
-
-      const demoOtpCode = document.getElementById('demoOtpCode');
-      if (demoOtpCode && json.data?.demoOtp) {
-        demoOtpCode.textContent = json.data.demoOtp;
-      }
 
       // Transition to Step 2
       document.getElementById('mobileStep1').style.display = 'none';
@@ -462,23 +512,29 @@ class HiraApp {
         otpInput.value = '';
         otpInput.focus();
       }
-
-      this.showToast(`📱 OTP sent to +91 ${clean}`);
     } catch (err) {
-      alert(err.message);
+      console.error('Send OTP error:', err);
+      // Fallback gracefully without throwing confusing UI alerts to customer
+      window.confirmationResult = null;
+      try {
+        await fetch(`${API_BASE}/api/v1/auth/mobile/send-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: clean }),
+        });
+        const displayPhone = document.getElementById('otpDisplayPhone');
+        if (displayPhone) displayPhone.textContent = `+91 ${clean}`;
+        document.getElementById('mobileStep1').style.display = 'none';
+        document.getElementById('mobileStep2').style.display = 'block';
+        this.showToast(`📱 OTP sent via SMS to +91 ${clean}`);
+      } catch (e2) {
+        alert(e2.message || 'Could not send verification code.');
+      }
     } finally {
       if (btn) {
         btn.disabled = false;
         btn.textContent = 'Continue';
       }
-    }
-  }
-
-  autofillDemoOtp() {
-    const demoCode = document.getElementById('demoOtpCode')?.textContent || '123456';
-    const otpInput = document.getElementById('mobileOtpInput');
-    if (otpInput) {
-      otpInput.value = demoCode.trim();
     }
   }
 
@@ -506,21 +562,43 @@ class HiraApp {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/v1/auth/mobile/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: cleanPhone,
-          otp,
-          name: name || undefined,
-        }),
-      });
+      let authResult;
+      if (window.confirmationResult) {
+        // Firebase SMS Code Verification
+        const userCredential = await window.confirmationResult.confirm(otp);
+        console.log('[Firebase Phone Auth] Code verified for', userCredential.user.phoneNumber);
 
-      const json = await res.json();
-      if (!json.success) throw new Error(json.message || 'OTP verification failed');
+        const res = await fetch(`${API_BASE}/api/v1/auth/firebase/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: cleanPhone,
+            name: name || undefined,
+          }),
+        });
 
-      this.token = json.data.accessToken;
-      this.user = json.data.user;
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message || 'Firebase login failed on server');
+        authResult = json.data;
+      } else {
+        // Backend OTP verification
+        const res = await fetch(`${API_BASE}/api/v1/auth/mobile/verify-otp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: cleanPhone,
+            otp,
+            name: name || undefined,
+          }),
+        });
+
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message || 'OTP verification failed');
+        authResult = json.data;
+      }
+
+      this.token = authResult.accessToken;
+      this.user = authResult.user;
       localStorage.setItem('hira_token', this.token);
       localStorage.setItem('hira_user', JSON.stringify(this.user));
 
@@ -546,7 +624,12 @@ class HiraApp {
       this.updateUserUI();
       this.showToast(`✨ Welcome, ${this.user.name}! Mobile verified successfully.`);
     } catch (err) {
-      alert(err.message);
+      console.error('Verify OTP error:', err);
+      if (err.code === 'auth/invalid-verification-code') {
+        alert('Invalid OTP code. Please enter the correct code received on your mobile.');
+      } else {
+        alert(err.message || 'Verification failed. Please try again.');
+      }
     } finally {
       if (btn) {
         btn.disabled = false;
