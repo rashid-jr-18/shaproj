@@ -9,6 +9,7 @@ import { hashPassword } from './crypto.ts';
 
 export interface IAuthRepository {
   findUserByEmail(email: string): Promise<User | null>;
+  findUserByPhone(phone: string): Promise<User | null>;
   findUserById(id: string): Promise<User | null>;
   createUser(user: Omit<User, 'id' | 'created_at' | 'updated_at'>): Promise<User>;
   updateUser(id: string, updates: Partial<User>): Promise<User | null>;
@@ -55,6 +56,17 @@ export class InMemoryAuthRepository implements IAuthRepository {
     const normalized = email.toLowerCase().trim();
     for (const u of this.users.values()) {
       if (u.email.toLowerCase() === normalized) {
+        return { ...u };
+      }
+    }
+    return null;
+  }
+
+  async findUserByPhone(phone: string): Promise<User | null> {
+    const clean = phone.replace(/\D/g, '').slice(-10);
+    if (!clean) return null;
+    for (const u of this.users.values()) {
+      if (u.phone && u.phone.replace(/\D/g, '').slice(-10) === clean) {
         return { ...u };
       }
     }

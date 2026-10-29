@@ -108,6 +108,30 @@ export const requestListener: http.RequestListener = async (req, res) => {
       return;
     }
 
+    // Indian Mobile OTP - Step 1: Send OTP (Swiggy / Zomato Flow)
+    if (pathname === '/api/v1/auth/mobile/send-otp' && method === 'POST') {
+      const body = await parseJsonBody(req);
+      if (!body.phone) {
+        sendJson(res, 400, { success: false, code: 'VALIDATION_ERROR', message: 'Mobile number is required.' }, correlationId);
+        return;
+      }
+      const result = await authService.sendMobileOtp(body.phone);
+      sendJson(res, 200, { success: true, message: result.message, data: result, correlationId }, correlationId);
+      return;
+    }
+
+    // Indian Mobile OTP - Step 2: Verify OTP & Auto-Authenticate
+    if (pathname === '/api/v1/auth/mobile/verify-otp' && method === 'POST') {
+      const body = await parseJsonBody(req);
+      if (!body.phone || !body.otp) {
+        sendJson(res, 400, { success: false, code: 'VALIDATION_ERROR', message: 'Mobile number and OTP are required.' }, correlationId);
+        return;
+      }
+      const session = await authService.verifyMobileOtp(body.phone, body.otp, body.name);
+      sendJson(res, 200, { success: true, data: session, correlationId }, correlationId);
+      return;
+    }
+
     // Refresh
     if (pathname === '/api/v1/auth/refresh' && method === 'POST') {
       const body = await parseJsonBody(req);

@@ -210,4 +210,39 @@ describe('Auth Service & Security Baseline Tests', () => {
     // Restore
     await repo.updateUser(newSession.user.id, { status: 'ACTIVE' });
   });
+
+  it('should implement Swiggy/Zomato style Mobile OTP Authentication flow', async () => {
+    const testPhone = '9876543219';
+
+    // 1. Invalid short phone should reject
+    await assert.rejects(
+      () => service.sendMobileOtp('12345'),
+      /valid 10-digit/i
+    );
+
+    // 2. Send OTP to valid 10-digit number
+    const sendRes = await service.sendMobileOtp(testPhone);
+    assert.strictEqual(sendRes.success, true);
+    assert.ok(sendRes.demoOtp);
+    assert.strictEqual(sendRes.demoOtp.length, 6);
+
+    // 3. Reject wrong OTP
+    await assert.rejects(
+      () => service.verifyMobileOtp(testPhone, '999999'),
+      /Invalid or expired OTP/i
+    );
+
+    // 4. Verify valid OTP -> auto-creates new user
+    const verifyRes = await service.verifyMobileOtp(testPhone, sendRes.demoOtp, 'Raseed Mobile');
+    assert.ok(verifyRes.accessToken);
+    assert.strictEqual(verifyRes.isNewUser, true);
+    assert.strictEqual(verifyRes.user.phone, `+91${testPhone}`);
+    assert.strictEqual(verifyRes.user.name, 'Raseed Mobile');
+    assert.strictEqual(verifyRes.user.role, 'CUSTOMER');
+
+    // 5. Existing user logs in again via OTP (e.g. universal fallback 123456)
+    const loginAgain = await service.verifyMobileOtp(testPhone, '123456');
+    assert.strictEqual(loginAgain.isNewUser, false);
+    assert.strictEqual(loginAgain.user.id, verifyRes.user.id);
+  });
 });

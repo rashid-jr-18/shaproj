@@ -268,4 +268,36 @@ describe('Hira Complete End-to-End System Tests', () => {
     assert.strictEqual(ownerPageRes.headers['content-type'], 'text/html');
     assert.ok(typeof ownerPageRes.body === 'string' && ownerPageRes.body.includes('Hira Store Owner'));
   });
+
+  it('should execute complete Swiggy/Zomato Mobile OTP journey (Send OTP -> Verify -> Login)', async () => {
+    const customerPhone = '9876543210';
+
+    // 1. Send OTP
+    const sendRes = await mockRequest(
+      'POST',
+      '/api/v1/auth/mobile/send-otp',
+      {},
+      { phone: customerPhone }
+    );
+    assert.strictEqual(sendRes.statusCode, 200);
+    assert.strictEqual(sendRes.body.success, true);
+    const demoOtp = sendRes.body.data.demoOtp;
+    assert.ok(demoOtp);
+
+    // 2. Verify OTP
+    const verifyRes = await mockRequest(
+      'POST',
+      '/api/v1/auth/mobile/verify-otp',
+      {},
+      {
+        phone: customerPhone,
+        otp: demoOtp,
+        name: 'Raseed',
+      }
+    );
+    assert.strictEqual(verifyRes.statusCode, 200);
+    assert.strictEqual(verifyRes.body.success, true);
+    assert.ok(verifyRes.body.data.accessToken);
+    assert.strictEqual(verifyRes.body.data.user.phone, `+91${customerPhone}`);
+  });
 });

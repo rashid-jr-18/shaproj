@@ -387,26 +387,172 @@ class HiraApp {
     }
   }
 
-  // --- Auth Modal & Guest Merge ---
+  // --- Swiggy / Zomato Mobile OTP Flow ---
   openAuthModal(isAutoPrompt = false) {
     if (this.user) {
-      if (confirm(`Logged in as ${this.user.name} (${this.user.email}). Would you like to log out?`)) {
+      if (confirm(`Signed in as ${this.user.name} (${this.user.phone || this.user.email}). Would you like to log out?`)) {
         this.logout();
       }
       return;
     }
 
-    const titleEl = document.getElementById('authModalTitle');
-    const subEl = document.getElementById('authModalSubtitle');
-    if (isAutoPrompt) {
-      if (titleEl) titleEl.textContent = 'Welcome to Hira ✨';
-      if (subEl) subEl.textContent = 'Sign in with Google or create an account to start shopping handcrafted artisanal collections.';
-    } else {
-      if (titleEl) titleEl.textContent = this.isRegisterMode ? 'Create your Hira Account' : 'Sign in to Hira';
-      if (subEl) subEl.textContent = 'Welcome back! Please sign in to access your orders and saved items.';
+    this.backToMobileStep1();
+    document.getElementById('authModal').style.display = 'flex';
+  }
+
+  backToMobileStep1() {
+    const s1 = document.getElementById('mobileStep1');
+    const s2 = document.getElementById('mobileStep2');
+    const s3 = document.getElementById('emailAuthStep');
+    if (s1) s1.style.display = 'block';
+    if (s2) s2.style.display = 'none';
+    if (s3) s3.style.display = 'none';
+  }
+
+  showEmailAuth(e) {
+    if (e) e.preventDefault();
+    const s1 = document.getElementById('mobileStep1');
+    const s2 = document.getElementById('mobileStep2');
+    const s3 = document.getElementById('emailAuthStep');
+    if (s1) s1.style.display = 'none';
+    if (s2) s2.style.display = 'none';
+    if (s3) s3.style.display = 'block';
+  }
+
+  async submitSendOtp() {
+    const phoneInput = document.getElementById('mobilePhoneInput');
+    const rawPhone = phoneInput ? phoneInput.value.trim() : '';
+    const clean = rawPhone.replace(/\D/g, '').slice(-10);
+
+    if (clean.length !== 10) {
+      alert('Please enter a valid 10-digit mobile number.');
+      return;
     }
 
-    document.getElementById('authModal').style.display = 'flex';
+    const btn = document.getElementById('sendOtpBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Sending OTP...';
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/auth/mobile/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: clean }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || 'Failed to send OTP');
+
+      // Update Step 2 screen
+      const displayPhone = document.getElementById('otpDisplayPhone');
+      if (displayPhone) displayPhone.textContent = `+91 ${clean}`;
+
+      const demoOtpCode = document.getElementById('demoOtpCode');
+      if (demoOtpCode && json.data?.demoOtp) {
+        demoOtpCode.textContent = json.data.demoOtp;
+      }
+
+      // Transition to Step 2
+      document.getElementById('mobileStep1').style.display = 'none';
+      document.getElementById('mobileStep2').style.display = 'block';
+
+      const otpInput = document.getElementById('mobileOtpInput');
+      if (otpInput) {
+        otpInput.value = '';
+        otpInput.focus();
+      }
+
+      this.showToast(`📱 OTP sent to +91 ${clean}`);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Continue';
+      }
+    }
+  }
+
+  autofillDemoOtp() {
+    const demoCode = document.getElementById('demoOtpCode')?.textContent || '123456';
+    const otpInput = document.getElementById('mobileOtpInput');
+    if (otpInput) {
+      otpInput.value = demoCode.trim();
+    }
+  }
+
+  async resendOtp() {
+    await this.submitSendOtp();
+  }
+
+  async submitVerifyOtp() {
+    const phoneInput = document.getElementById('mobilePhoneInput');
+    const cleanPhone = phoneInput ? phoneInput.value.replace(/\D/g, '').slice(-10) : '';
+    const otpInput = document.getElementById('mobileOtpInput');
+    const otp = otpInput ? otpInput.value.trim() : '';
+    const nameInput = document.getElementById('mobileNameInput');
+    const name = nameInput ? nameInput.value.trim() : 'Raseed';
+
+    if (otp.length < 4) {
+      alert('Please enter the 6-digit OTP received via SMS.');
+      return;
+    }
+
+    const btn = document.getElementById('verifyOtpBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Verifying...';
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/auth/mobile/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: cleanPhone,
+          otp,
+          name: name || undefined,
+        }),
+      });
+
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || 'OTP verification failed');
+
+      this.token = json.data.accessToken;
+      this.user = json.data.user;
+      localStorage.setItem('hira_token', this.token);
+      localStorage.setItem('hira_user', JSON.stringify(this.user));
+
+      // Merge guest cart into user cart
+      try {
+        await fetch(`${API_BASE}/api/v1/cart/merge`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            guestCartId: this.cartId,
+            userCartId: `user_cart_${this.user.id}`,
+            userId: this.user.id,
+          }),
+        });
+        this.cartId = `user_cart_${this.user.id}`;
+        localStorage.setItem('hira_cart_id', this.cartId);
+        await this.fetchCart();
+      } catch (mergeErr) {
+        console.warn('Cart merge info:', mergeErr);
+      }
+
+      this.closeModal('authModal');
+      this.updateUserUI();
+      this.showToast(`✨ Welcome, ${this.user.name}! Mobile verified successfully.`);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Verify & Continue';
+      }
+    }
   }
 
   async loginWithGoogle() {
