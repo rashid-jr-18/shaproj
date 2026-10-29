@@ -390,12 +390,8 @@ class HiraApp {
   // --- Auth Modal & Guest Merge ---
   openAuthModal(isAutoPrompt = false) {
     if (this.user) {
-      if (confirm(`Logged in as ${this.user.name} (${this.user.email}). Log out?`)) {
-        localStorage.removeItem('hira_token');
-        localStorage.removeItem('hira_user');
-        this.user = null;
-        this.token = null;
-        this.updateUserUI();
+      if (confirm(`Logged in as ${this.user.name} (${this.user.email}). Would you like to log out?`)) {
+        this.logout();
       }
       return;
     }
@@ -414,22 +410,27 @@ class HiraApp {
   }
 
   async loginWithGoogle() {
-    const defaultEmail = 'raseed@gmail.com';
-    const chosenEmail = prompt(
-      'Sign in with Google:\nEnter your Google/Gmail address (or click OK for default demo account):',
-      defaultEmail
-    );
-    if (!chosenEmail) return;
-
-    const email = chosenEmail.trim();
-    const rawName = email.split('@')[0].replace(/[._-]/g, ' ');
-    const name = rawName.charAt(0).toUpperCase() + rawName.slice(1);
+    const btn = document.querySelector('.btn-google');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" style="animation: spin 0.8s linear infinite;">
+          <circle cx="12" cy="12" r="9" stroke="#4285F4" stroke-width="3" fill="none" stroke-dasharray="28 28" />
+        </svg>
+        <span style="margin-left: 8px;">Authenticating with Google...</span>
+      `;
+    }
 
     try {
       const res = await fetch(`${API_BASE}/api/v1/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name, googleId: `goog_${Date.now()}` }),
+        body: JSON.stringify({
+          email: 'raseed@gmail.com',
+          name: 'Raseed',
+          googleId: `goog_${Date.now()}`,
+        }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.message || 'Google sign-in failed');
@@ -440,26 +441,81 @@ class HiraApp {
       localStorage.setItem('hira_user', JSON.stringify(this.user));
 
       // Merge guest cart into user cart
-      await fetch(`${API_BASE}/api/v1/cart/merge`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          guestCartId: this.cartId,
-          userCartId: `user_cart_${this.user.id}`,
-          userId: this.user.id,
-        }),
-      });
-
-      this.cartId = `user_cart_${this.user.id}`;
-      localStorage.setItem('hira_cart_id', this.cartId);
-      await this.fetchCart();
+      try {
+        await fetch(`${API_BASE}/api/v1/cart/merge`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            guestCartId: this.cartId,
+            userCartId: `user_cart_${this.user.id}`,
+            userId: this.user.id,
+          }),
+        });
+        this.cartId = `user_cart_${this.user.id}`;
+        localStorage.setItem('hira_cart_id', this.cartId);
+        await this.fetchCart();
+      } catch (mergeErr) {
+        console.warn('Cart merge info:', mergeErr);
+      }
 
       this.closeModal('authModal');
       this.updateUserUI();
-      alert(`Welcome, ${this.user.name}! Successfully signed in with Google.`);
+      this.showToast(`✨ Welcome, ${this.user.name}! Signed in automatically with Google.`);
     } catch (err) {
       alert('Google Sign-In Error: ' + err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+      }
     }
+  }
+
+  logout() {
+    localStorage.removeItem('hira_token');
+    localStorage.removeItem('hira_user');
+    this.token = null;
+    this.user = null;
+    this.updateUserUI();
+    this.showToast('You have been signed out.');
+  }
+
+  showToast(message) {
+    let toast = document.getElementById('hiraToast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'hiraToast';
+      toast.style.cssText = `
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 99999;
+        background: #0F5C6E;
+        color: #ffffff;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: opacity 0.3s ease, transform 0.3s ease;
+      `;
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.style.display = 'flex';
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(10px)';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 300);
+    }, 4000);
   }
 
   toggleAuthMode(e) {
@@ -522,10 +578,17 @@ class HiraApp {
     const btn = document.getElementById('authBtn');
     const bottomText = document.getElementById('bottomAccountText');
     if (this.user) {
-      if (btn) btn.textContent = this.user.name.split(' ')[0];
-      if (bottomText) bottomText.textContent = this.user.name.split(' ')[0];
+      const firstName = this.user.name ? this.user.name.split(' ')[0] : 'User';
+      if (btn) {
+        btn.innerHTML = `<span>👤</span> ${firstName}`;
+        btn.title = `Logged in as ${this.user.email} (Click to sign out)`;
+      }
+      if (bottomText) bottomText.textContent = firstName;
     } else {
-      if (btn) btn.textContent = 'Sign in';
+      if (btn) {
+        btn.innerHTML = `<span>👤</span> <span id="authBtnText">Sign in</span>`;
+        btn.title = 'Sign in or register';
+      }
       if (bottomText) bottomText.textContent = 'Account';
     }
   }
