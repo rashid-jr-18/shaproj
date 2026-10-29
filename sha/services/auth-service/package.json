@@ -1,0 +1,17 @@
+{
+  "name": "@hira/auth-service",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "node --watch --loader ts-node/esm src/server.ts",
+    "test": "node --test tests/*.test.js || tsx --test tests/*.test.ts || node --loader tsx tests/auth.test.ts"
+  },
+  "dependencies": {
+    "@hira/types": "workspace:*",
+    "@hira/config": "workspace:*"
+  }
+}
+

@@ -1,0 +1,37 @@
+{
+  "name": "hira-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hira E-commerce Microservices Application",
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "dev:gateway": "npm run dev -w services/api-gateway",
+    "dev:auth": "npm run dev -w services/auth-service",
+    "dev:catalog": "npm run dev -w services/catalog-service",
+    "dev:inventory": "npm run dev -w services/inventory-service",
+    "dev:cart": "npm run dev -w services/cart-service",
+    "dev:order": "npm run dev -w services/order-service",
+    "dev:payment": "npm run dev -w services/payment-service",
+    "dev:notification": "npm run dev -w services/notification-service",
+    "dev:web": "npm run dev -w apps/web",
+    "dev:admin": "npm run dev -w apps/admin"
+  },
+  "keywords": [
+    "ecommerce",
+    "microservices",
+    "hira",
+    "nextjs",
+    "react",
+    "nodejs"
+  ],
+  "author": "Hira Team",
+  "license": "UNLICENSED"
+}
+

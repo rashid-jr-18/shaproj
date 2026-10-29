@@ -1,0 +1,378 @@
+/* Hira Design System CSS - Warm, Human, Photography-First */
+:root {
+  --hira-primary: #0F5C6E;
+  --hira-primary-dark: #0A4452;
+  --hira-accent: #E8A317;
+  --hira-bg: #F6F7F5;
+  --hira-surface: #FFFFFF;
+  --hira-text: #22303C;
+  --hira-text-muted: #5E6B75;
+  --hira-border: #DCE1E4;
+  --hira-success: #2E7D4F;
+  --hira-warning: #B86E00;
+  --hira-danger: #B93A2E;
+
+  --font-heading: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
+  --font-body: 'Figtree', 'Noto Sans Tamil', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--hira-bg);
+  color: var(--hira-text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+  line-height: 1.2;
+  color: var(--hira-primary-dark);
+}
+
+a {
+  color: var(--hira-primary);
+  text-decoration: none;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: 16px; /* Prevents auto-zoom in iOS Safari */
+  border: 1px solid var(--hira-border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  background: var(--hira-surface);
+  color: var(--hira-text);
+  outline: none;
+  min-height: 44px; /* Touch target minimum */
+  width: 100%;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--hira-primary);
+  box-shadow: 0 0 0 2px rgba(15, 92, 110, 0.2);
+}
+
+button {
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  min-height: 44px;
+  min-width: 44px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  transition: background-color 0.15s ease, transform 0.05s ease;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background-color: var(--hira-primary);
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background-color: var(--hira-primary-dark);
+}
+
+.btn-accent {
+  background-color: var(--hira-accent);
+  color: var(--hira-text);
+}
+
+.btn-outline {
+  background-color: transparent;
+  border: 1px solid var(--hira-border);
+  color: var(--hira-text);
+}
+
+.btn-outline:hover {
+  background-color: #f0f2f1;
+}
+
+/* Header & Navigation */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: var(--hira-surface);
+  border-bottom: 1px solid var(--hira-border);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.nav-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.logo {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--hira-primary);
+  letter-spacing: -0.5px;
+}
+
+.logo span {
+  color: var(--hira-accent);
+}
+
+.search-bar {
+  flex: 1;
+  max-width: 480px;
+  position: relative;
+}
+
+/* Layout Container */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 16px 80px 16px;
+}
+
+/* Category Pills */
+.category-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 24px;
+  scrollbar-width: none;
+}
+
+.category-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: var(--hira-surface);
+  border: 1px solid var(--hira-border);
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--hira-text);
+}
+
+.chip.active {
+  background: var(--hira-primary);
+  color: #fff;
+  border-color: var(--hira-primary);
+}
+
+/* Product Grid (Responsive: 2-col mobile, 3-col tablet, 4-col desktop) */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 600px) {
+  .product-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .product-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+  }
+}
+
+/* Product Card */
+.product-card {
+  background: var(--hira-surface);
+  border: 1px solid var(--hira-border);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+}
+
+.product-card:hover {
+  border-color: var(--hira-primary);
+  box-shadow: 0 4px 12px rgba(15, 92, 110, 0.08);
+}
+
+.product-img-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background-color: #EAECE9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.product-img-placeholder {
+  font-size: 32px;
+  color: var(--hira-primary);
+  opacity: 0.7;
+}
+
+.product-info {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: space-between;
+}
+
+.product-category {
+  font-size: 12px;
+  color: var(--hira-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.product-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.current-price {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--hira-text);
+}
+
+.mrp-price {
+  font-size: 13px;
+  color: var(--hira-text-muted);
+  text-decoration: line-through;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.badge-success { background: #E6F4EA; color: var(--hira-success); }
+.badge-warning { background: #FEF3D6; color: var(--hira-warning); }
+.badge-danger { background: #FCE8E6; color: var(--hira-danger); }
+
+/* Bottom Bar (Mobile First Navigation) */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: var(--hira-surface);
+  border-top: 1px solid var(--hira-border);
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px)) 12px;
+}
+
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--hira-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
+}
+
+.bottom-nav-item.active {
+  color: var(--hira-primary);
+  font-weight: 600;
+}
+
+.cart-count-badge {
+  position: absolute;
+  top: 4px;
+  right: 18px;
+  background: var(--hira-accent);
+  color: var(--hira-text);
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 1px 6px;
+}
+
+/* Modals & Drawers */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+@media (min-width: 600px) {
+  .modal-overlay {
+    align-items: center;
+  }
+}
+
+.modal-sheet {
+  background: var(--hira-surface);
+  width: 100%;
+  max-width: 540px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 16px 16px 0 0;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px)) 20px;
+}
+
+@media (min-width: 600px) {
+  .modal-sheet {
+    border-radius: 12px;
+  }
+}
+

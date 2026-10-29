@@ -1,0 +1,16 @@
+{
+  "name": "@hira/api-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "node --experimental-strip-types --no-warnings --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "@hira/types": "workspace:*",
+    "@hira/config": "workspace:*"
+  }
+}
+

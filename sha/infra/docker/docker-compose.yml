@@ -1,0 +1,321 @@
+version: '3.8'
+
+networks:
+  hira_network:
+    driver: bridge
+
+volumes:
+  auth_db_data:
+  catalog_db_data:
+  inventory_db_data:
+  cart_redis_data:
+  order_db_data:
+  payment_db_data:
+  notification_db_data:
+  rabbitmq_data:
+
+services:
+  # ----------------------------------------------------
+  # Databases & Infrastructure Brokers (One DB per service)
+  # ----------------------------------------------------
+  auth_db:
+    image: postgres:16-alpine
+    container_name: hira_auth_db
+    environment:
+      POSTGRES_USER: hira_auth
+      POSTGRES_PASSWORD: hira_auth_password
+      POSTGRES_DB: auth_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+    networks:
+      - hira_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hira_auth -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  catalog_db:
+    image: postgres:16-alpine
+    container_name: hira_catalog_db
+    environment:
+      POSTGRES_USER: hira_catalog
+      POSTGRES_PASSWORD: hira_catalog_password
+      POSTGRES_DB: catalog_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - catalog_db_data:/var/lib/postgresql/data
+    networks:
+      - hira_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hira_catalog -d catalog_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  inventory_db:
+    image: postgres:16-alpine
+    container_name: hira_inventory_db
+    environment:
+      POSTGRES_USER: hira_inventory
+      POSTGRES_PASSWORD: hira_inventory_password
+      POSTGRES_DB: inventory_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - inventory_db_data:/var/lib/postgresql/data
+    networks:
+      - hira_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hira_inventory -d inventory_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  cart_redis:
+    image: redis:7-alpine
+    container_name: hira_cart_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - cart_redis_data:/data
+    networks:
+      - hira_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  order_db:
+    image: postgres:16-alpine
+    container_name: hira_order_db
+    environment:
+      POSTGRES_USER: hira_order
+      POSTGRES_PASSWORD: hira_order_password
+      POSTGRES_DB: order_db
+    ports:
+      - "5436:5432"
+    volumes:
+      - order_db_data:/var/lib/postgresql/data
+    networks:
+      - hira_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hira_order -d order_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  payment_db:
+    image: postgres:16-alpine
+    container_name: hira_payment_db
+    environment:
+      POSTGRES_USER: hira_payment
+      POSTGRES_PASSWORD: hira_payment_password
+      POSTGRES_DB: payment_db
+    ports:
+      - "5437:5432"
+    volumes:
+      - payment_db_data:/var/lib/postgresql/data
+    networks:
+      - hira_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hira_payment -d payment_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  notification_db:
+    image: postgres:16-alpine
+    container_name: hira_notification_db
+    environment:
+      POSTGRES_USER: hira_notification
+      POSTGRES_PASSWORD: hira_notification_password
+      POSTGRES_DB: notification_db
+    ports:
+      - "5438:5432"
+    volumes:
+      - notification_db_data:/var/lib/postgresql/data
+    networks:
+      - hira_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hira_notification -d notification_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: hira_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: hira_admin
+      RABBITMQ_DEFAULT_PASS: hira_secret_rabbitmq
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - hira_network
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------
+  # Microservices
+  # ----------------------------------------------------
+  api-gateway:
+    build:
+      context: ../../
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: hira_api_gateway
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: 8000
+      AUTH_SERVICE_URL: http://auth-service:3001
+      CATALOG_SERVICE_URL: http://catalog-service:3002
+      INVENTORY_SERVICE_URL: http://inventory-service:3003
+      CART_SERVICE_URL: http://cart-service:3004
+      ORDER_SERVICE_URL: http://order-service:3005
+      PAYMENT_SERVICE_URL: http://payment-service:3006
+    depends_on:
+      - auth-service
+      - catalog-service
+      - inventory-service
+      - cart-service
+      - order-service
+      - payment-service
+    networks:
+      - hira_network
+
+  auth-service:
+    build:
+      context: ../../
+      dockerfile: services/auth-service/Dockerfile
+    container_name: hira_auth_service
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgres://hira_auth:hira_auth_password@auth_db:5432/auth_db
+      RABBITMQ_URL: amqp://hira_admin:hira_secret_rabbitmq@rabbitmq:5672
+    depends_on:
+      auth_db:
+        condition: service_healthy
+    networks:
+      - hira_network
+
+  catalog-service:
+    build:
+      context: ../../
+      dockerfile: services/catalog-service/Dockerfile
+    container_name: hira_catalog_service
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgres://hira_catalog:hira_catalog_password@catalog_db:5432/catalog_db
+      RABBITMQ_URL: amqp://hira_admin:hira_secret_rabbitmq@rabbitmq:5672
+    depends_on:
+      catalog_db:
+        condition: service_healthy
+    networks:
+      - hira_network
+
+  inventory-service:
+    build:
+      context: ../../
+      dockerfile: services/inventory-service/Dockerfile
+    container_name: hira_inventory_service
+    ports:
+      - "3003:3003"
+    environment:
+      PORT: 3003
+      DATABASE_URL: postgres://hira_inventory:hira_inventory_password@inventory_db:5432/inventory_db
+      RABBITMQ_URL: amqp://hira_admin:hira_secret_rabbitmq@rabbitmq:5672
+    depends_on:
+      inventory_db:
+        condition: service_healthy
+    networks:
+      - hira_network
+
+  cart-service:
+    build:
+      context: ../../
+      dockerfile: services/cart-service/Dockerfile
+    container_name: hira_cart_service
+    ports:
+      - "3004:3004"
+    environment:
+      PORT: 3004
+      REDIS_URL: redis://cart_redis:6379
+      INVENTORY_SERVICE_URL: http://inventory-service:3003
+      CATALOG_SERVICE_URL: http://catalog-service:3002
+    depends_on:
+      cart_redis:
+        condition: service_healthy
+    networks:
+      - hira_network
+
+  order-service:
+    build:
+      context: ../../
+      dockerfile: services/order-service/Dockerfile
+    container_name: hira_order_service
+    ports:
+      - "3005:3005"
+    environment:
+      PORT: 3005
+      DATABASE_URL: postgres://hira_order:hira_order_password@order_db:5432/order_db
+      INVENTORY_SERVICE_URL: http://inventory-service:3003
+      PAYMENT_SERVICE_URL: http://payment-service:3006
+      RABBITMQ_URL: amqp://hira_admin:hira_secret_rabbitmq@rabbitmq:5672
+    depends_on:
+      order_db:
+        condition: service_healthy
+    networks:
+      - hira_network
+
+  payment-service:
+    build:
+      context: ../../
+      dockerfile: services/payment-service/Dockerfile
+    container_name: hira_payment_service
+    ports:
+      - "3006:3006"
+    environment:
+      PORT: 3006
+      DATABASE_URL: postgres://hira_payment:hira_payment_password@payment_db:5432/payment_db
+      RABBITMQ_URL: amqp://hira_admin:hira_secret_rabbitmq@rabbitmq:5672
+      RAZORPAY_KEY_ID: rzp_test_dummy
+      RAZORPAY_KEY_SECRET: rzp_test_secret
+      WEBHOOK_SECRET: rzp_whsec_dummy
+    depends_on:
+      payment_db:
+        condition: service_healthy
+    networks:
+      - hira_network
+
+  notification-service:
+    build:
+      context: ../../
+      dockerfile: services/notification-service/Dockerfile
+    container_name: hira_notification_service
+    ports:
+      - "3007:3007"
+    environment:
+      PORT: 3007
+      DATABASE_URL: postgres://hira_notification:hira_notification_password@notification_db:5432/notification_db
+      RABBITMQ_URL: amqp://hira_admin:hira_secret_rabbitmq@rabbitmq:5672
+    depends_on:
+      notification_db:
+        condition: service_healthy
+    networks:
+      - hira_network
+
